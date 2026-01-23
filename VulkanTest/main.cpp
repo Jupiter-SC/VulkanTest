@@ -38,9 +38,14 @@ private:
     const uint32_t WIDTH = 800;
     const uint32_t HEIGHT = 600;
 
-    // Validation Layers
+    // Required Validation Layers
     const std::vector<const char*> validationLayers = {
         "VK_LAYER_KHRONOS_validation"
+    };
+
+    // Required Extensions
+    const std::vector<const char*> deviceExtensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
 
 #ifdef NDEBUG
@@ -50,12 +55,12 @@ private:
 #endif
 
     // Vulkan Unique
-    VkInstance instance = NULL;
+    VkInstance instance = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VkDevice device = NULL;         // Logical device
-    VkQueue graphicsQueue = NULL;   // 
-    VkSurfaceKHR surface = NULL;    // Surface to be rendered to. GLFW does this
-    VkQueue presentQueue = NULL;    // 
+    VkDevice device = VK_NULL_HANDLE;         // Logical device
+    VkQueue graphicsQueue = VK_NULL_HANDLE;   // 
+    VkSurfaceKHR surface = VK_NULL_HANDLE;    // Surface to be rendered to. GLFW does this
+    VkQueue presentQueue = VK_NULL_HANDLE;    // 
     
 #pragma region Main Functions
 
@@ -67,7 +72,7 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz. Swap Chain", nullptr, nullptr);
+        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Swap Chain", nullptr, nullptr);
         
         printf("[Window]\t Ready!\n");
     }
@@ -77,9 +82,9 @@ private:
 
         createInstance();
         // setupDebuggerMessenger();
+        createSurface();
         pickPhysicalDevice();
         createLogicalDevice();
-        createSurface();
 
         printf("[Vulkan]\t Ready!\n");
     }
@@ -94,6 +99,7 @@ private:
         printf("[Clean Up]\t Started\n");
 
         // Vulkan
+
         vkDestroyDevice(device, nullptr);
         vkDestroySurfaceKHR(instance, surface, nullptr);
 
@@ -211,7 +217,7 @@ private:
 
     /// <summary>
     /// Find first GPU that supports the features we want
-    /// TODO Update this to be more sophisticated. EX: rate GPU suitablility and choose the highest 
+    /// TODO Update this to be more sophisticated. EX: rate GPU suitablility and choose the highest, or just pick dedicated GPU
     /// </summary>
     void pickPhysicalDevice() {
         uint32_t deviceCount = 0;
@@ -246,18 +252,13 @@ private:
     /// <returns></returns>
     bool isDeviceSuitable(VkPhysicalDevice device) {
         QueueFamilyIndices indices = findQueueFamilies(device);
+        //bool extensionsSupported = checkDeviceExtensionSupport(device);
 
-        return indices.graphicsFamily.has_value();
+        // TODO
 
-        VkPhysicalDeviceProperties deviceProperties;
-        vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
-        VkPhysicalDeviceFeatures deviceFeatures;
-        vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
-        return 
-            deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
-            deviceFeatures.geometryShader;
+        return indices.isComplete() /*&& extensionsSupported*/;
     }
     
     // Queue families
@@ -278,6 +279,8 @@ private:
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
         std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+
+        // Problem
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
         int i = 0;
@@ -306,7 +309,7 @@ private:
     // TODO Logical Device Setup
     
     /// <summary>
-    /// Creates a Logical Device to describe the features you want to use
+    /// Creates a Logical Device to describe the features you want to use. A representation of Physical Device
     /// </summary>
     void createLogicalDevice() {
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
@@ -332,16 +335,16 @@ private:
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.pQueueCreateInfos = queueCreateInfos.data();
+
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+        createInfo.pQueueCreateInfos = queueCreateInfos.data();
         createInfo.pEnabledFeatures = &deviceFeatures;
         createInfo.enabledExtensionCount = 0;
 
         if (enableValidationLayers) {
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
             createInfo.ppEnabledLayerNames = validationLayers.data();
-        }
-        else {
+        } else {
             createInfo.enabledLayerCount = 0;
         }
 
@@ -360,6 +363,10 @@ private:
         if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
             throw std::runtime_error("failed to create window surface!");
         }
+    }
+
+    bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
+        return true;
     }
 
 #pragma endregion
