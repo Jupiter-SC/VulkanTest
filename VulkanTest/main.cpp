@@ -66,14 +66,15 @@ private:
     // Vulkan Unique
     VkInstance instance = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VkDevice device = VK_NULL_HANDLE;         // Logical device
-    VkQueue graphicsQueue = VK_NULL_HANDLE;   // 
-    VkSurfaceKHR surface = VK_NULL_HANDLE;    // Surface to be rendered to. GLFW does this
-    VkQueue presentQueue = VK_NULL_HANDLE;    // 
-    VkSwapchainKHR swapChain;
-    std::vector<VkImage> swapChainImages;
+    VkDevice device = VK_NULL_HANDLE;           // Logical device
+    VkQueue graphicsQueue = VK_NULL_HANDLE;     // 
+    VkSurfaceKHR surface = VK_NULL_HANDLE;      // Surface to be rendered to. GLFW does this
+    VkQueue presentQueue = VK_NULL_HANDLE;      // Commands being sent to Vulkan to execute
+    VkSwapchainKHR swapChain;                   
+    std::vector<VkImage> swapChainImages;       // The images we're rendering
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
+    std::vector<VkImageView> swapChainImageViews;   // Accessing our images
     
 #pragma region Main Functions
 
@@ -85,7 +86,7 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Swap Chain", nullptr, nullptr);
+        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Graphics Pipeline", nullptr, nullptr);
         
         printf("[Window]\t Ready!\n");
     }
@@ -97,8 +98,10 @@ private:
         // setupDebuggerMessenger();
         createSurface();
         pickPhysicalDevice();
+
         createLogicalDevice();
         createSwapChain();
+        createImageViews();
 
         printf("[Vulkan]\t Ready!\n");
     }
@@ -113,6 +116,9 @@ private:
         printf("[Clean Up]\t Started\n");
 
         // Vulkan
+        for (auto imageView : swapChainImageViews) {
+            vkDestroyImageView(device, imageView, nullptr);
+        }
 
         vkDestroySwapchainKHR(device, swapChain, nullptr);
         vkDestroyDevice(device, nullptr);
@@ -134,10 +140,11 @@ private:
     void createInstance() {
         printf("[Vulkan]\t Creating Instance...\n");
 
+
         if (enableValidationLayers && !checkValidationLayerSupport())
             throw std::runtime_error("Validation layers requested, but not available");
 
-        printf("[Vulkan]\t Set up validation layers\n");
+        printf("[Vulkan]\t Setup validation layers\n");
 
         VkApplicationInfo appInfo{};
         appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -172,7 +179,6 @@ private:
         }
 
         // List loaded extensions
-        printf("[Vulkan]\t Loading extensions\n");
 
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
         std::vector<VkExtensionProperties> extensions(extensionCount);
@@ -228,8 +234,6 @@ private:
     std::vector<const char*> getRequiredExtensions() {
     }
 
-    // Pick A GPU
-
     /// <summary>
     /// Find first GPU that supports the features we want
     /// TODO Update this to be more sophisticated. EX: rate GPU suitablility and choose the highest, or just pick dedicated GPU
@@ -255,7 +259,7 @@ private:
         if (physicalDevice == VK_NULL_HANDLE) {
             throw std::runtime_error("Failed to find a suitable GPU!");
         }
-
+        
         printf("[Vulkan]\t Picked GPU\n");
     }
 
@@ -279,6 +283,7 @@ private:
     }
     
     // Queue families
+
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily;
         std::optional<uint32_t> presentFamily;
@@ -322,8 +327,6 @@ private:
 
         return indices;
     }
-
-    // TODO Logical Device Setup
     
     /// <summary>
     /// Creates a Logical Device to describe the features you want to use. A representation of Physical Device
@@ -373,6 +376,8 @@ private:
 
         vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
         vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+
+        printf("[Vulkan]\t Created Logical Device\n");
     }
 
     /// <summary>
@@ -400,7 +405,7 @@ private:
         return requiredExtensions.empty();
     }
 
-    // Swap Chain
+#pragma region Swap Chain
 
     void createSwapChain() {
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
@@ -456,6 +461,8 @@ private:
 
         swapChainImageFormat = surfaceFormat.format;
         swapChainExtent = extent;
+
+        printf("[Vulkan]\t Created Swap Chain\n");
     }
 
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
@@ -521,6 +528,36 @@ private:
             actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
             return actualExtent;
+        }
+    }
+
+#pragma endregion
+
+    void createImageViews() {
+        swapChainImageViews.resize(swapChainImages.size());
+
+        for (size_t i = 0; i < swapChainImages.size(); i++) {
+            VkImageViewCreateInfo createInfo{};
+            createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            createInfo.image = swapChainImages[i];
+
+            createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            createInfo.format = swapChainImageFormat;
+
+            createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+            createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            createInfo.subresourceRange.baseMipLevel = 0;
+            createInfo.subresourceRange.levelCount = 1;
+            createInfo.subresourceRange.baseArrayLayer = 0;
+            createInfo.subresourceRange.layerCount = 1;
+
+            if (vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS) {
+                throw std::runtime_error("failed to create image views!");
+            }
         }
     }
 
