@@ -24,6 +24,7 @@
 #include <set>
 #include <limits>
 #include <algorithm>
+#include <fstream>
 
 class HelloTriangleApplication {
 public:
@@ -69,7 +70,7 @@ private:
     VkDevice device = VK_NULL_HANDLE;           // Logical device
     VkQueue graphicsQueue = VK_NULL_HANDLE;     // 
     VkSurfaceKHR surface = VK_NULL_HANDLE;      // Surface to be rendered to. GLFW does this
-    VkQueue presentQueue = VK_NULL_HANDLE;      // Commands being sent to Vulkan to execute
+    VkQueue presentQueue = VK_NULL_HANDLE;      // Images to be presented to the screen
     VkSwapchainKHR swapChain;                   
     std::vector<VkImage> swapChainImages;       // The images we're rendering
     VkFormat swapChainImageFormat;
@@ -86,7 +87,7 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Graphics Pipeline", nullptr, nullptr);
+        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Fixed Functions", nullptr, nullptr);
         
         printf("[Window]\t Ready!\n");
     }
@@ -102,6 +103,8 @@ private:
         createLogicalDevice();
         createSwapChain();
         createImageViews();
+
+        createGraphicsPipeline(); // It's really that easy
 
         printf("[Vulkan]\t Ready!\n");
     }
@@ -533,6 +536,9 @@ private:
 
 #pragma endregion
 
+    /// <summary>
+    /// So we can actually use the images in or swap chain
+    /// </summary>
     void createImageViews() {
         swapChainImageViews.resize(swapChainImages.size());
 
@@ -559,6 +565,79 @@ private:
                 throw std::runtime_error("failed to create image views!");
             }
         }
+    }
+
+    /// <summary>
+    /// The name describes it
+    /// Can we load shaders later and insert them?
+    /// </summary>
+    void createGraphicsPipeline() {
+        auto vertShaderCode = readFile("shaders/vert.spv");
+        auto fragShaderCode = readFile("shaders/frag.spv");
+
+        VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+        VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+        VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertShaderStageInfo.module = vertShaderModule;
+        vertShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+        fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragShaderStageInfo.module = fragShaderModule;
+        fragShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+        vkDestroyShaderModule(device, fragShaderModule, nullptr);
+        vkDestroyShaderModule(device, vertShaderModule, nullptr);
+
+        printf("[Vulkan]\t Created Graphics Pipeline\n");
+    }
+
+    /// <summary>
+    /// Helper function for loading shaders
+    /// </summary>
+    static std::vector<char> readFile(const std::string& filename) {
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+        if (!file.is_open()) {
+            throw std::runtime_error("Failed to open file: " + filename);
+        }
+
+        size_t fileSize = (size_t)file.tellg();
+        std::vector<char> buffer(fileSize);
+
+        file.seekg(0);
+        file.read(buffer.data(), fileSize);
+        file.close();
+
+        printf("[Vulkan]\t Shader Loaded: ");
+        printf(filename.c_str());
+        printf("\n");
+
+        return buffer;
+    }
+
+    /// <summary>
+    /// Byte code -> usable shader module
+    /// </summary>
+    VkShaderModule createShaderModule(const std::vector<char>& code) {
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = code.size();
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+        // this is getting really familiar
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create shader module!");
+        }
+
+        return shaderModule;
     }
 
 #pragma endregion

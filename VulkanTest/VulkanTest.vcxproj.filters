@@ -19,4 +19,21 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="compile.bat">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="shaders\frag.spv">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="shaders\shader.frag">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="shaders\shader.vert">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="shaders\vert.spv">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>
