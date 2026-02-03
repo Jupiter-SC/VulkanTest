@@ -2,12 +2,9 @@
 // By: Jupiter Sinclair Chong
 // I'll remove all the succes prints later, they're just there cuz it's satisfying
 
-// Vulkan
-#include <vulkan/vulkan.h>
+// Renderer
+#include "renderer.h"
 
-// GLFW
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
 
 // GLM
 #define GLM_FORCE_RADIANS
@@ -15,28 +12,32 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 
-// C++
-#include <iostream>
-#include <stdexcept>
-#include <cstdlib>
-#include <vector>
-#include <cstring>
-#include <optional>
-#include <set>
-#include <limits>
-#include <algorithm>
-#include <fstream>
 
 class HelloTriangleApplication {
 public:
     void run() {
         initWindow();
+
+        // Application specific setup
+        RendererLayerCreateInfo RL_CreateInfo;
+        RL_CreateInfo.window = window;
+
+        LogicalDeviceCreateInfo LI_CreateInfo;
+        LI_CreateInfo.deviceExtensions = deviceExtensions;
+        LI_CreateInfo.validationLayers = validationLayers;
+
+        RL_CreateInfo.LI_CreateInfo;
+
+        renderer = RendererLayer(RL_CreateInfo);
+        
         initVulkan();
         mainLoop();
         cleanup();
     }
 
 private:
+    RendererLayer renderer;
+
     // Window vars
     GLFWwindow* window = nullptr; 
     const uint32_t WIDTH = 800;
@@ -99,7 +100,7 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Rendering Presenting", nullptr, nullptr);
+        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Performant Triangle", nullptr, nullptr);
         
         printf("[Window]\t Ready!\n");
     }
@@ -108,11 +109,12 @@ private:
         printf("[Vulkan]\t Initting Vulkan\n");
 
         createInstance();
+
         // setupDebuggerMessenger();
         createSurface();
         pickPhysicalDevice();
-
         createLogicalDevice();
+
         createSwapChain();
         createImageViews();
 
@@ -647,7 +649,7 @@ private:
             throw std::runtime_error("failed to create render pass!");
         }
         else {
-            std::cout << "[Vulkan]\t Render Pass Created\n";
+            std::cout << "[Vulkan]\t Created A Render Pass\n";
         }
 
     }
