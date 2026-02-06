@@ -1,3 +1,6 @@
+// Vulkan Test
+// By: Jupiter Sinclair Chong
+
 #pragma once
 
 // Vulkan
@@ -22,19 +25,15 @@
 // Create structs to pass in data to new objects do it like vulkan lol
 
 struct LogicalDeviceCreateInfo {
-    // Required Extensions
     std::vector<const char*> deviceExtensions;
-
-    // Required Validation Layers
     std::vector<const char*> validationLayers;
-
 
 #ifdef NDEBUG
     const bool enableValidationLayers = false;
 #else
     const bool enableValidationLayers = true;
 #endif
-
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
 };
 
 /// <summary>
@@ -139,11 +138,13 @@ struct Instance {
         for (const auto& extension : extensions)
             std::cout << '\t' << extension.extensionName << '\n';
 
-        VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
-
         if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
             throw std::runtime_error("failed to create instance!");
         }
+        else {
+            printf("[Vulkan]\t Created instance!\n");
+        }
+
     }
 
     ~Instance() {
@@ -152,11 +153,12 @@ struct Instance {
 };
 
 /// <summary>
-/// Surface to be rendered to. GLFW does this
+/// Surface to be rendered to. GLFW handles this
 /// </summary>
 struct Surface {
     VkSurfaceKHR surface = VK_NULL_HANDLE;
 
+    // Needed for cleanup
     Instance* instance = nullptr;
 
     Surface() {
@@ -168,10 +170,12 @@ struct Surface {
     /// </summary>
     Surface(Instance* instance, GLFWwindow* window) {
         if (glfwCreateWindowSurface(instance->instance, window, nullptr, &surface) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create window surface!");
+            throw std::runtime_error("Failed to create window surface!");
         }
 
         this->instance = instance;
+
+        printf("[Vulkan]\t Created Surface\n");
     }
 
     ~Surface() {
@@ -195,8 +199,7 @@ class LogicalDevice {
         std::optional<uint32_t> presentFamily;
 
         bool isComplete() {
-            return graphicsFamily.has_value() && \
-                presentFamily.has_value();
+            return graphicsFamily.has_value() && presentFamily.has_value();
         }
     };
 
@@ -214,7 +217,6 @@ class LogicalDevice {
 
         std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
 
-        // Problem
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
         int i = 0;
@@ -224,6 +226,7 @@ class LogicalDevice {
             }
 
             VkBool32 presentSupport = false;
+            // TODO Problem, surface invalid for some reason
             vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
 
             if (presentSupport) {
@@ -335,7 +338,10 @@ public:
 
     }
 
-    LogicalDevice(Instance* instance, LogicalDeviceCreateInfo ci, VkQueue graphicsQueue, VkQueue presentQueue) {
+    LogicalDevice(Instance* instance, LogicalDeviceCreateInfo ci, VkQueue graphicsQueue, VkQueue presentQueue, VkSurfaceKHR surface) {
+        //this->surface = ci.surface;
+        this->surface = surface;
+        
         pickPhysicalDevice(instance, ci.deviceExtensions);
 
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
@@ -361,11 +367,9 @@ public:
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
         createInfo.pEnabledFeatures = &deviceFeatures;
-
         createInfo.enabledExtensionCount = static_cast<uint32_t>(ci.deviceExtensions.size());
         createInfo.ppEnabledExtensionNames = ci.deviceExtensions.data();
 
@@ -393,6 +397,13 @@ public:
 
 };
 
+// Queues?
+// Render Pass
+// Framebuffers
+// Pipeline Layout?
+// Shader?
+
+
 class RendererLayer {
 private:
 
@@ -411,24 +422,40 @@ private:
 
     // Required Extensions
     std::vector<const char*> deviceExtensions;
+
+    // Why does it work then this is a pointer ?
+    Instance* instance;
+
+    Surface surface;
+
+    LogicalDevice logicalDevice;
+
 public:
+    RendererLayer() {
+
+    }
 
     RendererLayer(RendererLayerCreateInfo createInfo) {
-        this->window = window;
+        this->window = createInfo.window;
 
         printf("[Vulkan]\t Initting Vulkan\n");
 
-        instance = Instance(enableValidationLayers, validationLayers);
+        // Hmmm who should own these cuz they're being passed twice in 2 diff ways rn
+        validationLayers = createInfo.LI_CreateInfo.validationLayers;
+        deviceExtensions = createInfo.LI_CreateInfo.deviceExtensions;
 
-        // setupDebuggerMessenger();
-        //createSurface();
-        
-        surface = Surface(&instance, createInfo.window);
-        
+        instance = new Instance(enableValidationLayers, validationLayers);
+
+        surface = Surface(instance, createInfo.window);
+
+        // More elegant way to pass this to Logical Device?
+        // Should logical device own Surface?
+        createInfo.LI_CreateInfo.surface = surface.surface;
+
         //pickPhysicalDevice();
         //createLogicalDevice();
         
-        logicalDevice = LogicalDevice(&instance, createInfo.LI_CreateInfo, graphicsQueue, presentQueue);
+        logicalDevice = LogicalDevice(instance, createInfo.LI_CreateInfo, graphicsQueue, presentQueue, surface.surface);
         
         //createSwapChain();
         //createImageViews();
@@ -452,11 +479,4 @@ public:
 
     }
 
-private:
-
-    Instance instance;
-    
-    Surface surface;
-
-   LogicalDevice logicalDevice;
 };
