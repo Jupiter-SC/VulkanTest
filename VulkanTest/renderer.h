@@ -22,184 +22,37 @@
 #include <algorithm>
 #include <fstream>
 
-// Create structs to pass in data to new objects do it like vulkan lol
+namespace Renderer {
 
-// ? Not necessary now to have 2 create infos...
-struct LogicalDeviceCreateInfo {
-    std::vector<const char*> deviceExtensions;
-    std::vector<const char*> validationLayers;
+
+#pragma region Create Infos
+    // Create structs to pass in data to new objects do it like vulkan lol
+    // ? Not necessary now to have 2 create infos...
+    struct LogicalDeviceCreateInfo {
+        std::vector<const char*> deviceExtensions;
+        std::vector<const char*> validationLayers;
 
 #ifdef NDEBUG
-    const bool enableValidationLayers = false;
+        const bool enableValidationLayers = false;
 #else
-    const bool enableValidationLayers = true;
+        const bool enableValidationLayers = true;
 #endif
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
-};
-
-/// <summary>
-/// Used to pass application specific information when setting up Renderer Layer
-/// </summary>
-struct RendererLayerCreateInfo {
-    GLFWwindow* window = nullptr;
-
-    LogicalDeviceCreateInfo LI_CreateInfo;
-};
-
-/// <summary>
-/// Connection between this App and Vulkan library
-/// </summary>
-struct Instance {
-    VkInstance instance = VK_NULL_HANDLE;
+        VkSurfaceKHR surface = VK_NULL_HANDLE;
+    };
 
     /// <summary>
-    /// Check if all layers in Validation Layers exist in Available Layers
+    /// Used to pass application specific information when setting up Renderer Layer
     /// </summary>
-    bool checkValidationLayerSupport(std::vector<const char*> validationLayers) {
-        uint32_t layerCount;
-        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+    struct RendererLayerCreateInfo {
+        GLFWwindow* window = nullptr;
 
-        std::vector<VkLayerProperties> availableLayers(layerCount);
-        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+        LogicalDeviceCreateInfo LI_CreateInfo;
+    };
 
-        for (const char* layerName : validationLayers) {
-            bool layerFound = false;
+#pragma endregion
 
-            for (const auto& layerProperties : availableLayers) {
-                if (strcmp(layerName, layerProperties.layerName) == 0) {
-                    layerFound = true;
-                    break;
-                }
-            }
 
-            if (!layerFound) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    Instance() {
-
-    }
-
-    Instance(bool enableValidationLayers, std::vector<const char*> validationLayers) {
-        printf("[Vulkan]\t Creating Instance...\n");
-
-        if (enableValidationLayers && !checkValidationLayerSupport(validationLayers))
-            throw std::runtime_error("Validation layers requested, but not available");
-
-        printf("[Vulkan]\t Setup validation layers\n");
-
-        VkApplicationInfo appInfo{};
-        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName = "Hello Triangle";
-        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.pEngineName = "No Engine";
-        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
-
-        VkInstanceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        createInfo.pApplicationInfo = &appInfo;
-
-        // Determine the extensions needed to interface with GLFW
-        uint32_t glfwExtensionCount = 0;
-        uint32_t extensionCount = 0;
-        const char** glfwExtensions;
-
-        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-        createInfo.enabledExtensionCount = glfwExtensionCount;
-        createInfo.ppEnabledExtensionNames = glfwExtensions;
-        createInfo.enabledLayerCount = 0;
-
-        // Load validation layers into Create Info
-        if (enableValidationLayers) {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-            createInfo.ppEnabledLayerNames = validationLayers.data();
-        }
-        else {
-            createInfo.enabledLayerCount = 0;
-        }
-
-        // List loaded extensions
-
-        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-        std::vector<VkExtensionProperties> extensions(extensionCount);
-        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-
-        //auto extensions = getRequiredExtensions();
-        //createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-        //createInfo.ppEnabledExtensionNames = extensions.data();
-
-        std::cout << "[Vulkan]\t Supported Extensions:\n";
-
-        for (const auto& extension : extensions)
-            std::cout << '\t' << extension.extensionName << '\n';
-
-        if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create instance!");
-        }
-        else {
-            printf("[Vulkan]\t Created instance!\n");
-        }
-
-    }
-
-    ~Instance() {
-        printf("[Cleanup]\t Destroying Instance\n"),
-        vkDestroyInstance(instance, nullptr);
-    }
-};
-
-/// <summary>
-/// Surface to be rendered to. GLFW handles this
-/// </summary>
-struct Surface {
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
-
-    // Needed for cleanup
-    Instance* instance = nullptr;
-
-    Surface() {
-
-    }
-
-    /// <summary>
-    /// Sets Surface using GLFW
-    /// </summary>
-    Surface(Instance* instance, GLFWwindow* window) {
-        if (glfwCreateWindowSurface(instance->instance, window, nullptr, &surface) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create window surface!");
-        }
-
-        this->instance = instance;
-
-        printf("[Vulkan]\t Created Surface\n");
-    }
-
-    // Problem is that it's going out of scope immediately
-    ~Surface() {
-        printf("[Cleanup]\t Destroying Surface\n");
-        vkDestroySurfaceKHR(instance->instance, surface, nullptr);
-    }
-
-};
-
-/// <summary>
-/// This is the actual thing we need
-/// Logical Device: Describe the features you want to use. A representation of Physical Device
-/// </summary>
-class LogicalDevice {
-    VkDevice device = VK_NULL_HANDLE;
-
-    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    //VkSurfaceKHR surface = VK_NULL_HANDLE;
-
-    Surface* surface;
-    Instance* instance;
+#pragma region Helper Structs
 
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily;
@@ -216,304 +69,123 @@ class LogicalDevice {
         std::vector<VkPresentModeKHR> presentModes;
     };
 
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
-        QueueFamilyIndices indices;
+#pragma endregion
 
-        uint32_t queueFamilyCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+#pragma region Component Structs
+    /// <summary>
+    /// Connection between this App and Vulkan library
+    /// </summary>
+    struct Instance {
+        VkInstance instance = VK_NULL_HANDLE;
 
-        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        /// <summary>
+        /// Check if all layers in Validation Layers exist in Available Layers
+        /// </summary>
+        bool checkValidationLayerSupport(std::vector<const char*> validationLayers);
 
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+        Instance();
 
-        int i = 0;
-        for (const VkQueueFamilyProperties& queueFamily : queueFamilies) {
-            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                indices.graphicsFamily = i;
-            }
+        Instance(bool enableValidationLayers, std::vector<const char*> validationLayers);
 
-            VkBool32 presentSupport = false;
-            // TODO Problem, surface invalid for some reason
-            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface->surface, &presentSupport);
+        ~Instance();
+    };
 
-            if (presentSupport) {
-                indices.presentFamily = i;
-            }
-
-            if (indices.isComplete()) {
-                break;
-            }
-
-            i++;
-        }
-
-        return indices;
-    }
-
-    bool checkDeviceExtensionSupport(VkPhysicalDevice device, std::vector<const char*> deviceExtensions) {
-        uint32_t extensionCount;
-        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
-
-        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
-
-        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
-
-        for (const auto& extension : availableExtensions) {
-            requiredExtensions.erase(extension.extensionName);
-        }
-
-        return requiredExtensions.empty();
-    }
-
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
-        SwapChainSupportDetails details;
-
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
-
-        // Query supported surface formats
-        uint32_t formatCount;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
-
-        if (formatCount != 0) {
-            details.formats.resize(formatCount);
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
-        }
-
-        // Queeery Presentation Modes
-        uint32_t presentModeCount;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
-
-        if (presentModeCount != 0) {
-            details.presentModes.resize(presentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
-        }
-
-        return details;
-    }
 
     /// <summary>
-    /// Params for how we determine whether to use a device
-    /// TODO Only checking queue families RN. Update this to be more sophisticated
+    /// Surface to be rendered to. GLFW handles this
     /// </summary>
-    /// <param name="device"></param>
-    /// <returns></returns>
-    bool isDeviceSuitable(VkPhysicalDevice device, std::vector<const char*> deviceExtensions) {
-        QueueFamilyIndices indices = findQueueFamilies(device);
-        bool extensionsSupported = checkDeviceExtensionSupport(device, deviceExtensions);
+    struct Surface {
+        VkSurfaceKHR surface = VK_NULL_HANDLE;
 
-        bool swapChainAdequate = false;
-        if (extensionsSupported) {
-            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device, surface->surface);
-            swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
-        }
+        // Needed for cleanup
+        Instance* instance = nullptr;
 
-        return indices.isComplete() && extensionsSupported && swapChainAdequate;
-    }
+        Surface();
 
-    /// <summary>
-    /// Find first GPU that supports the features we want
-    /// TODO Update this to be more sophisticated. EX: rate GPU suitablility and choose the highest, or just pick dedicated GPU
-    /// </summary>
-    void pickPhysicalDevice(Instance* instance, std::vector<const char*> deviceExtensions) {
-        uint32_t deviceCount = 0;
-        vkEnumeratePhysicalDevices(instance->instance, &deviceCount, nullptr);
+        /// <summary>
+        /// Sets Surface using GLFW
+        /// </summary>
+        Surface(Instance* instance, GLFWwindow* window);
 
-        if (deviceCount == 0) {
-            throw std::runtime_error("Failed to find GPUs with Vulkan support");
-        }
+        ~Surface();
+    };
 
-        std::vector<VkPhysicalDevice> devices(deviceCount);
-        vkEnumeratePhysicalDevices(instance->instance, &deviceCount, devices.data());
+    struct LogicalDevice {
+        VkDevice device = VK_NULL_HANDLE;
+        VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
-        for (const auto& device : devices) {
-            if (isDeviceSuitable(device, deviceExtensions)) {
-                physicalDevice = device;
-                break;
-            }
-        }
+        Surface* surface;
+        Instance* instance;
 
-        if (physicalDevice == VK_NULL_HANDLE) {
-            throw std::runtime_error("Failed to find a suitable GPU!");
-        }
+    public:
+        LogicalDevice();
 
-        printf("[Vulkan]\t Picked GPU\n");
-    }
+        LogicalDevice(Instance* instance, LogicalDeviceCreateInfo ci, VkQueue graphicsQueue, VkQueue presentQueue, Surface* surface);
 
-public:
-    LogicalDevice() {
-
-    }
-
-    LogicalDevice(Instance* instance, LogicalDeviceCreateInfo ci, VkQueue graphicsQueue, VkQueue presentQueue, Surface* surface) {
-        this->instance = instance;
-        this->surface = surface;
-
-        pickPhysicalDevice(instance, ci.deviceExtensions);
-
-        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
-
-        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-        std::set<uint32_t> uniqueQueueFamilies = {
-           indices.graphicsFamily.value(),
-           indices.presentFamily.value()
-        };
-
-        float queuePriority = 1.0f;
-
-        for (uint32_t queueFamily : uniqueQueueFamilies) {
-            VkDeviceQueueCreateInfo queueCreateInfo{};
-            queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-            queueCreateInfo.queueFamilyIndex = queueFamily;
-            queueCreateInfo.queueCount = 1;
-            queueCreateInfo.pQueuePriorities = &queuePriority;
-            queueCreateInfos.push_back(queueCreateInfo);
-        }
-
-        VkPhysicalDeviceFeatures deviceFeatures{};
-
-        VkDeviceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-        createInfo.pQueueCreateInfos = queueCreateInfos.data();
-        createInfo.pEnabledFeatures = &deviceFeatures;
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(ci.deviceExtensions.size());
-        createInfo.ppEnabledExtensionNames = ci.deviceExtensions.data();
-
-        if (ci.enableValidationLayers) {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(ci.validationLayers.size());
-            createInfo.ppEnabledLayerNames = ci.validationLayers.data();
-        }
-        else {
-            createInfo.enabledLayerCount = 0;
-        }
-
-        if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create logical device!");
-        }
-
-        vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
-        vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
-
-        printf("[Vulkan]\t Created Logical Device\n");
-    }
-
-    ~LogicalDevice() {
-        printf("[Cleanup]\t Destroying Logical Device\n");
-        vkDestroyDevice(device, nullptr);
-    }
-
-};
-
-// Queues?
-// Render Pass
-// Framebuffers
-// Pipeline Layout?
-// Shader?
+        ~LogicalDevice();
+    };
 
 
-class RendererLayer {
-private:
+    struct SwapChain {
+        LogicalDevice* logicalDevice;
+
+        VkSwapchainKHR swapChain;
+        std::vector<VkImage> swapChainImages;           // The images we're rendering
+        VkFormat swapChainImageFormat;
+        VkExtent2D swapChainExtent;
+        std::vector<VkImageView> swapChainImageViews;   // Accessing our images
+
+        VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+
+        VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
+
+        VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, GLFWwindow* window);
+
+        SwapChain(LogicalDevice* logicalDevice, Surface* surface, GLFWwindow* window);
+
+        ~SwapChain();
+    };
+
+    class RendererLayer {
 
 #ifdef NDEBUG
-    const bool enableValidationLayers = false;
+        const bool enableValidationLayers = false;
 #else
-    const bool enableValidationLayers = true;
+        const bool enableValidationLayers = true;
 #endif
 
-    GLFWwindow* window = nullptr;
-    VkQueue graphicsQueue = VK_NULL_HANDLE;     // 
-    VkQueue presentQueue = VK_NULL_HANDLE;      // Images to be presented to the screen
+        GLFWwindow* window = nullptr;
+        VkQueue graphicsQueue = VK_NULL_HANDLE;     // 
+        VkQueue presentQueue = VK_NULL_HANDLE;      // Images to be presented to the screen
 
-    // Required Validation Layers
-    std::vector<const char*> validationLayers;
+        // Required Validation Layers
+        std::vector<const char*> validationLayers;
 
-    // Required Extensions
-    std::vector<const char*> deviceExtensions;
+        // Required Extensions
+        std::vector<const char*> deviceExtensions;
 
-    // These are only woking as pointers cuz otherwise they get destroyed too soon, but IDK why
+        // These are only woking as pointers cuz otherwise they get destroyed too soon, but IDK why
 
-    Instance* instance;
+        Instance* instance;
+        Surface* surface;
+        LogicalDevice* logicalDevice;
+        SwapChain* swapChain;
 
-    Surface* surface;
+    public:
+        RendererLayer();
 
-    LogicalDevice* logicalDevice;
+        RendererLayer(RendererLayer& rh);
 
-public:
-    RendererLayer() {
+        RendererLayer(RendererLayerCreateInfo createInfo);
 
-    }
+        ~RendererLayer();
 
-    RendererLayer(RendererLayer& rh) {
-        this->window = rh.window;
-        this->graphicsQueue = rh.presentQueue;
-        this->validationLayers = rh.validationLayers;
-        this->deviceExtensions = rh.deviceExtensions;
-        
-        this->instance = rh.instance;
-        this->surface = rh.surface;
-        this->logicalDevice = rh.logicalDevice;
-    }
+        RendererLayer& operator=(const RendererLayer& other);
 
-    RendererLayer(RendererLayerCreateInfo createInfo) {
-        this->window = createInfo.window;
+        // TODO Draw from a scene object
+        void drawFrame();
 
-        printf("[Vulkan]\t Initting Vulkan\n");
+    };
+#pragma endregion
 
-        // Hmmm who should own these cuz they're being passed twice in 2 diff ways rn
-        validationLayers = createInfo.LI_CreateInfo.validationLayers;
-        deviceExtensions = createInfo.LI_CreateInfo.deviceExtensions;
-
-        instance = new Instance(enableValidationLayers, validationLayers);
-
-        surface = new Surface(instance, createInfo.window);
-
-        // More elegant way to pass this to Logical Device?
-        // Should logical device own Surface?
-        //createInfo.LI_CreateInfo.surface = surface.surface;
-
-        //pickPhysicalDevice();
-        //createLogicalDevice();
-        
-        logicalDevice = new LogicalDevice(instance, createInfo.LI_CreateInfo, graphicsQueue, presentQueue, surface);
-        
-        //createSwapChain();
-        //createImageViews();
-
-        //createRenderPass();
-        //createGraphicsPipeline();   // It's really that easy
-        //createFramebuffers();       // Back to more familiar territory
-        //createCommandPool();
-        //createCommandBuffer();
-        //createSyncObjects();
-
-        printf("[Vulkan]\t Ready!\n");
-    }
-
-    ~RendererLayer() {
-        printf("[Cleanup]\t Destroying Renderer Layer\n");
-        
-        delete logicalDevice;
-        delete surface;
-        delete instance;
-    }
-
-    RendererLayer& operator=(const RendererLayer& other) {
-        this->window = other.window;
-        this->graphicsQueue = other.presentQueue;
-        this->validationLayers = other.validationLayers;
-        this->deviceExtensions = other.deviceExtensions;
-
-        this->instance = other.instance;
-        this->surface = other.surface;
-        this->logicalDevice = other.logicalDevice;
-
-        return *this;
-    }
-
-    // TODO Draw from a scene object
-    void drawFrame() {
-
-    }
-
-};
+}

@@ -18,7 +18,7 @@ public:
         initWindow();
 
         // Application specific setup
-        RendererLayerCreateInfo RL_CreateInfo;
+        Renderer::RendererLayerCreateInfo RL_CreateInfo;
         RL_CreateInfo.window = window;
 
         RL_CreateInfo.LI_CreateInfo.deviceExtensions = deviceExtensions;
@@ -34,14 +34,14 @@ public:
 
         //rendererNotPointer = RendererLayer(RL_CreateInfo);
 
-        renderer = new RendererLayer(RL_CreateInfo);
+        renderer = new Renderer::RendererLayer(RL_CreateInfo);
 
         mainLoop();
         cleanup();
     }
 
 private:
-    RendererLayer* renderer;
+    Renderer::RendererLayer* renderer;
     //RendererLayer rendererNotPointer;
 
     // Window vars
@@ -80,7 +80,7 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: ", nullptr, nullptr);
+        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Architecture - Fuck Header Files", nullptr, nullptr);
 
         printf("[Window]\t Ready!\n");
     }
@@ -103,5 +103,7 @@ private:
 
         glfwDestroyWindow(window);
         glfwTerminate();
+
+        printf("[Cleanup]\t Finished\n");
     }
 };

@@ -135,6 +135,7 @@
   <ItemGroup>
     <ClCompile Include="helloTriangleArch.h" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat" />

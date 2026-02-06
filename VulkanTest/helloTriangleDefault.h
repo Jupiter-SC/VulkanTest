@@ -3,8 +3,24 @@
 
 #pragma once
 
-// Renderer Layer
-#include "renderer.h"
+// Vulkan
+#include <vulkan/vulkan.h>
+
+// GLFW
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+// C++
+#include <vector>
+#include <iostream>
+#include <stdexcept>
+#include <cstdlib>
+#include <cstring>
+#include <optional>
+#include <set>
+#include <limits>
+#include <algorithm>
+#include <fstream>
 
 // GLM
 #define GLM_FORCE_RADIANS
@@ -12,30 +28,18 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 
+namespace ManualTriangle {
+
 class HelloTriangleDefault {
 public:
     void run() {
         initWindow();
-
-        // Application specific setup
-        RendererLayerCreateInfo RL_CreateInfo;
-        RL_CreateInfo.window = window;
-
-        LogicalDeviceCreateInfo LI_CreateInfo;
-        LI_CreateInfo.deviceExtensions = deviceExtensions;
-        LI_CreateInfo.validationLayers = validationLayers;
-
-        RL_CreateInfo.LI_CreateInfo;
-
-        //renderer = new RendererLayer(RL_CreateInfo);
-
         initVulkan();
         mainLoop();
         cleanup();
     }
 
 private:
-    //RendererLayer* renderer;
 
     // Window vars
     GLFWwindow* window = nullptr;
@@ -1023,3 +1027,4 @@ private:
         vkQueuePresentKHR(presentQueue, &presentInfo);
     }
 };
+}
