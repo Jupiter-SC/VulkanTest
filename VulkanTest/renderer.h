@@ -24,7 +24,6 @@
 
 namespace Renderer {
 
-
 #pragma region Create Infos
     // Create structs to pass in data to new objects do it like vulkan lol
     // ? Not necessary now to have 2 create infos...
@@ -50,7 +49,6 @@ namespace Renderer {
     };
 
 #pragma endregion
-
 
 #pragma region Helper Structs
 
@@ -88,8 +86,15 @@ namespace Renderer {
         Instance(bool enableValidationLayers, std::vector<const char*> validationLayers);
 
         ~Instance();
-    };
 
+        Instance& operator=(const Instance& other);
+
+        // This defeats like half the point of this but I have to cuz the destructors are called when using copy assignments
+        void cleanup(){
+            vkDestroyInstance(instance, nullptr);
+            printf("[Cleanup]\t Destroyed Instance\n");
+        }
+    };
 
     /// <summary>
     /// Surface to be rendered to. GLFW handles this
@@ -108,14 +113,22 @@ namespace Renderer {
         Surface(Instance* instance, GLFWwindow* window);
 
         ~Surface();
+
+        void cleanup() {        
+            vkDestroySurfaceKHR(instance->instance, surface, nullptr);
+            printf("[Cleanup]\t Destroyed Surface\n");
+        }
     };
 
+    /// <summary>
+    /// Describes the features we want to use. A representation of Physical Device
+    /// </summary>
     struct LogicalDevice {
         VkDevice device = VK_NULL_HANDLE;
         VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
-        Surface* surface;
-        Instance* instance;
+        Surface* surface = nullptr;
+        Instance* instance = nullptr;
 
     public:
         LogicalDevice();
@@ -123,13 +136,20 @@ namespace Renderer {
         LogicalDevice(Instance* instance, LogicalDeviceCreateInfo ci, VkQueue graphicsQueue, VkQueue presentQueue, Surface* surface);
 
         ~LogicalDevice();
+
+        void cleanup() {
+            vkDestroyDevice(device, nullptr);
+            printf("[Cleanup]\t Destroyed Logical Device\n");
+        }
     };
 
-
+    /// <summary>
+    /// 
+    /// </summary>
     struct SwapChain {
-        LogicalDevice* logicalDevice;
+        LogicalDevice* logicalDevice = nullptr;
 
-        VkSwapchainKHR swapChain;
+        VkSwapchainKHR swapChain = VK_NULL_HANDLE;
         std::vector<VkImage> swapChainImages;           // The images we're rendering
         VkFormat swapChainImageFormat;
         VkExtent2D swapChainExtent;
@@ -141,11 +161,50 @@ namespace Renderer {
 
         VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, GLFWwindow* window);
 
+        SwapChain();
+
         SwapChain(LogicalDevice* logicalDevice, Surface* surface, GLFWwindow* window);
 
         ~SwapChain();
+
+        void cleanup() {
+            for (VkImageView imageView : swapChainImageViews) {
+                vkDestroyImageView(logicalDevice->device, imageView, nullptr);
+            }
+
+            vkDestroySwapchainKHR(logicalDevice->device, swapChain, nullptr);
+
+            printf("[Cleanup] Destroyed Swap Chain");
+        }
     };
 
+    /// <summary>
+    /// 
+    /// </summary>
+    struct RenderPass {
+        VkRenderPass renderPass = VK_NULL_HANDLE;
+
+        LogicalDevice* logicalDevice = nullptr;
+        
+        RenderPass();
+
+        RenderPass(LogicalDevice* logicalDevice, VkFormat swapChainImageFormat);
+
+        ~RenderPass();
+
+        RenderPass(const RenderPass& other);
+
+        RenderPass& operator=(const RenderPass& other);
+
+        void cleanup() {
+            vkDestroyRenderPass(logicalDevice->device, renderPass, nullptr);
+            printf("[Cleanup]\t Destroyed Render Pass");
+        }
+    };
+
+    /// <summary>
+    /// 
+    /// </summary>
     class RendererLayer {
 
 #ifdef NDEBUG
@@ -166,10 +225,11 @@ namespace Renderer {
 
         // These are only woking as pointers cuz otherwise they get destroyed too soon, but IDK why
 
-        Instance* instance;
-        Surface* surface;
-        LogicalDevice* logicalDevice;
-        SwapChain* swapChain;
+        Instance instance;
+        Surface surface;
+        LogicalDevice logicalDevice;
+        SwapChain swapChain;
+        RenderPass renderPass;         // Ooo
 
     public:
         RendererLayer();

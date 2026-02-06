@@ -34,9 +34,7 @@ namespace Renderer {
         return true;
     }
 
-    Instance::Instance() {
-
-    }
+    Instance::Instance() {}
 
     Instance::Instance(bool enableValidationLayers, std::vector<const char*> validationLayers) {
         printf("[Vulkan]\t Creating Instance...\n");
@@ -103,8 +101,15 @@ namespace Renderer {
     }
 
     Instance::~Instance() {
-        printf("[Cleanup]\t Destroying Instance\n"),
-            vkDestroyInstance(instance, nullptr);
+        //vkDestroyInstance(instance, nullptr);
+        //printf("[Cleanup]\t Destroyed Instance\n");
+    }
+
+    Instance& Instance::operator=(const Instance& other)
+    {
+        this->instance = other.instance;
+
+        return *this;
     }
 
     // Surface
@@ -122,8 +127,8 @@ namespace Renderer {
     }
 
     Surface::~Surface() {
-        printf("[Cleanup]\t Destroying Surface\n");
-        vkDestroySurfaceKHR(instance->instance, surface, nullptr);
+        //vkDestroySurfaceKHR(instance->instance, surface, nullptr);
+        //printf("[Cleanup]\t Destroyed Surface\n");
     }
 
 
@@ -313,8 +318,8 @@ namespace Renderer {
     }
 
     LogicalDevice::~LogicalDevice() {
-        printf("[Cleanup]\t Destroying Logical Device\n");
-        vkDestroyDevice(device, nullptr);
+        //vkDestroyDevice(device, nullptr);
+        //printf("[Cleanup]\t Destroyed Logical Device\n");
     }
 
     // Swap Chain
@@ -357,6 +362,10 @@ namespace Renderer {
 
             return actualExtent;
         }
+    }
+
+    SwapChain::SwapChain() {
+        this->logicalDevice = nullptr;
     }
 
     SwapChain::SwapChain(LogicalDevice* logicalDevice, Surface* surface, GLFWwindow* window) {
@@ -419,19 +428,95 @@ namespace Renderer {
     }
 
     SwapChain::~SwapChain() {
-        for (VkImageView imageView : swapChainImageViews) {
-            vkDestroyImageView(logicalDevice->device, imageView, nullptr);
-        }
+        //for (VkImageView imageView : swapChainImageViews) {
+        //    vkDestroyImageView(logicalDevice->device, imageView, nullptr);
+        //}
 
-        vkDestroySwapchainKHR(logicalDevice->device, swapChain, nullptr);
+        //vkDestroySwapchainKHR(logicalDevice->device, swapChain, nullptr);
+    }
+
+    // Render Pass
+
+    RenderPass::RenderPass() {
+        //this->logicalDevice == nullptr;
+        //printf("[Bruh]\t Render Pass Default Constructor :(\n");
+    }
+
+    RenderPass::RenderPass(LogicalDevice* logicalDevice, VkFormat swapChainImageFormat) {
+        this->logicalDevice = logicalDevice;
+
+        VkAttachmentDescription colorAttachment{};
+        colorAttachment.format = swapChainImageFormat;
+        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        VkSubpassDependency dependency{};
+        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.dstSubpass = 0;
+        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.srcAccessMask = 0;
+        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        // Subpasses are later rendering operations that depend on the contents of framebuffers in previous passes
+        // Subpasses can be used for stacking post processing effects more memory efficiently cuz Vulkan reorders them
+        VkAttachmentReference colorAttachmentRef{};
+        colorAttachmentRef.attachment = 0;
+        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpass{};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &colorAttachmentRef;
+
+        VkRenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = 1;
+        renderPassInfo.pAttachments = &colorAttachment;
+        renderPassInfo.subpassCount = 1;    // yay
+        renderPassInfo.pSubpasses = &subpass;
+        renderPassInfo.dependencyCount = 1;
+        renderPassInfo.pDependencies = &dependency;
+
+        if (vkCreateRenderPass(logicalDevice->device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create render pass!");
+        }
+        else {
+            std::cout << "[Vulkan]\t Created A Render Pass\n";
+        }
+    }
+
+    RenderPass::~RenderPass() {
+        //vkDestroyRenderPass(logicalDevice->device, renderPass, nullptr);
+        //printf("[Cleanup]\t Destroyed Render Pass");
+    }
+
+    RenderPass::RenderPass(const RenderPass& other) : 
+        renderPass(other.renderPass), logicalDevice(other.logicalDevice)
+    {}
+
+
+    RenderPass& RenderPass::operator=(const RenderPass& other)
+    {
+        this->logicalDevice = other.logicalDevice;
+        this->renderPass = other.renderPass;
+
+        return *this;
     }
 
 #pragma endregion
 
     // Renderer Layer
 
-    RendererLayer::RendererLayer() {
-
+    RendererLayer::RendererLayer()
+    {
+        printf("BROOO\n");
+        return;
     }
 
     RendererLayer::RendererLayer(RendererLayer& rh) {
@@ -454,19 +539,16 @@ namespace Renderer {
         validationLayers = createInfo.LI_CreateInfo.validationLayers;
         deviceExtensions = createInfo.LI_CreateInfo.deviceExtensions;
 
-        instance = new Instance(enableValidationLayers, validationLayers);
+        instance = Instance(enableValidationLayers, validationLayers);
 
-        surface = new Surface(instance, createInfo.window);
+        surface = Surface(&instance, createInfo.window);
 
-        // More elegant way to pass this to Logical Device?
-        // Should logical device own Surface?
-        //createInfo.LI_CreateInfo.surface = surface.surface;
+        logicalDevice = LogicalDevice(&instance, createInfo.LI_CreateInfo, graphicsQueue, presentQueue, &surface);
 
-        logicalDevice = new LogicalDevice(instance, createInfo.LI_CreateInfo, graphicsQueue, presentQueue, surface);
+        swapChain = SwapChain(&logicalDevice, &surface, window);
 
-        swapChain = new SwapChain(logicalDevice, surface, window);
+        renderPass = RenderPass(&logicalDevice, swapChain.swapChainImageFormat);
 
-        //createRenderPass();
         //createGraphicsPipeline();   // It's really that easy
         //createFramebuffers();       // Back to more familiar territory
         //createCommandPool();
@@ -477,12 +559,21 @@ namespace Renderer {
     }
 
     RendererLayer::~RendererLayer() {
-        printf("[Cleanup]\t Destroying Renderer Layer\n");
+        printf("[Cleanup]\t Destroying Renderer Layer...\n");
 
-        delete swapChain;
-        delete surface;
-        delete logicalDevice;
-        delete instance;
+        renderPass.cleanup();
+        swapChain.cleanup();
+        surface.cleanup();
+        logicalDevice.cleanup();
+        instance.cleanup();
+
+        //delete renderPass;
+        //delete swapChain;
+        //delete surface;
+        //delete logicalDevice;
+        //delete instance;
+
+        printf("[Cleanup]\t Destroyed Renderer Layer\n");
     }
 
     RendererLayer& RendererLayer::operator=(const RendererLayer& other) {
