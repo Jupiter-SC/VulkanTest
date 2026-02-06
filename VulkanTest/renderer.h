@@ -24,6 +24,7 @@
 
 // Create structs to pass in data to new objects do it like vulkan lol
 
+// ? Not necessary now to have 2 create infos...
 struct LogicalDeviceCreateInfo {
     std::vector<const char*> deviceExtensions;
     std::vector<const char*> validationLayers;
@@ -148,6 +149,7 @@ struct Instance {
     }
 
     ~Instance() {
+        printf("[Cleanup]\t Destroying Instance\n"),
         vkDestroyInstance(instance, nullptr);
     }
 };
@@ -178,7 +180,9 @@ struct Surface {
         printf("[Vulkan]\t Created Surface\n");
     }
 
+    // Problem is that it's going out of scope immediately
     ~Surface() {
+        printf("[Cleanup]\t Destroying Surface\n");
         vkDestroySurfaceKHR(instance->instance, surface, nullptr);
     }
 
@@ -192,7 +196,10 @@ class LogicalDevice {
     VkDevice device = VK_NULL_HANDLE;
 
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    //VkSurfaceKHR surface = VK_NULL_HANDLE;
+
+    Surface* surface;
+    Instance* instance;
 
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily;
@@ -227,7 +234,7 @@ class LogicalDevice {
 
             VkBool32 presentSupport = false;
             // TODO Problem, surface invalid for some reason
-            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface->surface, &presentSupport);
 
             if (presentSupport) {
                 indices.presentFamily = i;
@@ -259,7 +266,7 @@ class LogicalDevice {
         return requiredExtensions.empty();
     }
 
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
         SwapChainSupportDetails details;
 
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
@@ -297,7 +304,7 @@ class LogicalDevice {
 
         bool swapChainAdequate = false;
         if (extensionsSupported) {
-            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device, surface->surface);
             swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
         }
 
@@ -338,10 +345,10 @@ public:
 
     }
 
-    LogicalDevice(Instance* instance, LogicalDeviceCreateInfo ci, VkQueue graphicsQueue, VkQueue presentQueue, VkSurfaceKHR surface) {
-        //this->surface = ci.surface;
+    LogicalDevice(Instance* instance, LogicalDeviceCreateInfo ci, VkQueue graphicsQueue, VkQueue presentQueue, Surface* surface) {
+        this->instance = instance;
         this->surface = surface;
-        
+
         pickPhysicalDevice(instance, ci.deviceExtensions);
 
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
@@ -392,6 +399,7 @@ public:
     }
 
     ~LogicalDevice() {
+        printf("[Cleanup]\t Destroying Logical Device\n");
         vkDestroyDevice(device, nullptr);
     }
 
@@ -423,16 +431,28 @@ private:
     // Required Extensions
     std::vector<const char*> deviceExtensions;
 
-    // Why does it work then this is a pointer ?
+    // These are only woking as pointers cuz otherwise they get destroyed too soon, but IDK why
+
     Instance* instance;
 
-    Surface surface;
+    Surface* surface;
 
-    LogicalDevice logicalDevice;
+    LogicalDevice* logicalDevice;
 
 public:
     RendererLayer() {
 
+    }
+
+    RendererLayer(RendererLayer& rh) {
+        this->window = rh.window;
+        this->graphicsQueue = rh.presentQueue;
+        this->validationLayers = rh.validationLayers;
+        this->deviceExtensions = rh.deviceExtensions;
+        
+        this->instance = rh.instance;
+        this->surface = rh.surface;
+        this->logicalDevice = rh.logicalDevice;
     }
 
     RendererLayer(RendererLayerCreateInfo createInfo) {
@@ -446,16 +466,16 @@ public:
 
         instance = new Instance(enableValidationLayers, validationLayers);
 
-        surface = Surface(instance, createInfo.window);
+        surface = new Surface(instance, createInfo.window);
 
         // More elegant way to pass this to Logical Device?
         // Should logical device own Surface?
-        createInfo.LI_CreateInfo.surface = surface.surface;
+        //createInfo.LI_CreateInfo.surface = surface.surface;
 
         //pickPhysicalDevice();
         //createLogicalDevice();
         
-        logicalDevice = LogicalDevice(instance, createInfo.LI_CreateInfo, graphicsQueue, presentQueue, surface.surface);
+        logicalDevice = new LogicalDevice(instance, createInfo.LI_CreateInfo, graphicsQueue, presentQueue, surface);
         
         //createSwapChain();
         //createImageViews();
@@ -470,12 +490,29 @@ public:
         printf("[Vulkan]\t Ready!\n");
     }
 
-    // TODO Draw from a scene object
-    void drawFrame() {
-
+    ~RendererLayer() {
+        printf("[Cleanup]\t Destroying Renderer Layer\n");
+        
+        delete logicalDevice;
+        delete surface;
+        delete instance;
     }
 
-    ~RendererLayer() {
+    RendererLayer& operator=(const RendererLayer& other) {
+        this->window = other.window;
+        this->graphicsQueue = other.presentQueue;
+        this->validationLayers = other.validationLayers;
+        this->deviceExtensions = other.deviceExtensions;
+
+        this->instance = other.instance;
+        this->surface = other.surface;
+        this->logicalDevice = other.logicalDevice;
+
+        return *this;
+    }
+
+    // TODO Draw from a scene object
+    void drawFrame() {
 
     }
 

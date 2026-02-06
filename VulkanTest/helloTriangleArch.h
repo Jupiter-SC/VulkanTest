@@ -32,6 +32,8 @@ public:
         LI_CreateInfo.validationLayers = validationLayers;
         */
 
+        //rendererNotPointer = RendererLayer(RL_CreateInfo);
+
         renderer = new RendererLayer(RL_CreateInfo);
 
         mainLoop();
@@ -40,6 +42,7 @@ public:
 
 private:
     RendererLayer* renderer;
+    //RendererLayer rendererNotPointer;
 
     // Window vars
     GLFWwindow* window = nullptr;
@@ -77,7 +80,7 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Architecture", nullptr, nullptr);
+        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: ", nullptr, nullptr);
 
         printf("[Window]\t Ready!\n");
     }
@@ -92,7 +95,7 @@ private:
     }
 
     void cleanup() {
-        printf("[Clean Up]\t Started\n");
+        printf("[Cleanup]\t Started\n");
 
         // Vulkan
 
