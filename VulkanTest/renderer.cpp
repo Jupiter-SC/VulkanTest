@@ -19,7 +19,7 @@ namespace Renderer {
         for (const char* layerName : validationLayers) {
             bool layerFound = false;
 
-            for (const auto& layerProperties : availableLayers) {
+            for (const VkLayerProperties& layerProperties : availableLayers) {
                 if (strcmp(layerName, layerProperties.layerName) == 0) {
                     layerFound = true;
                     break;
@@ -82,13 +82,9 @@ namespace Renderer {
         std::vector<VkExtensionProperties> extensions(extensionCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 
-        //auto extensions = getRequiredExtensions();
-        //createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-        //createInfo.ppEnabledExtensionNames = extensions.data();
-
         std::cout << "[Vulkan]\t Supported Extensions:\n";
 
-        for (const auto& extension : extensions)
+        for (const VkExtensionProperties& extension : extensions)
             std::cout << '\t' << extension.extensionName << '\n';
 
         if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
@@ -189,7 +185,7 @@ namespace Renderer {
 
         std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
-        for (const auto& extension : availableExtensions) {
+        for (const VkExtensionProperties& extension : availableExtensions) {
             requiredExtensions.erase(extension.extensionName);
         }
 
@@ -256,7 +252,7 @@ namespace Renderer {
         std::vector<VkPhysicalDevice> devices(deviceCount);
         vkEnumeratePhysicalDevices(instance->instance, &deviceCount, devices.data());
 
-        for (const auto& device : devices) {
+        for (const VkPhysicalDevice& device : devices) {
             if (isDeviceSuitable(device, deviceExtensions, surface)) {
                 physicalDevice = device;
                 break;
@@ -276,7 +272,7 @@ namespace Renderer {
 
     LogicalDevice::LogicalDevice() {}
 
-    LogicalDevice::LogicalDevice(Instance* instance, LogicalDeviceCreateInfo ci, VkQueue graphicsQueue, VkQueue presentQueue, Surface* surface) {
+    LogicalDevice::LogicalDevice(Instance* instance, LogicalDeviceCreateInfo ci, Surface* surface) {
         this->instance = instance;
         this->surface = surface;
 
@@ -347,7 +343,7 @@ namespace Renderer {
     // Swap Chain
 
     VkSurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
-        for (const auto& availableFormat : availableFormats) {
+        for (const VkSurfaceFormatKHR& availableFormat : availableFormats) {
             if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
                 return availableFormat;
             }
@@ -357,7 +353,7 @@ namespace Renderer {
     }
 
     VkPresentModeKHR SwapChain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
-        for (const auto& availablePresentMode : availablePresentModes) {
+        for (const VkPresentModeKHR& availablePresentMode : availablePresentModes) {
             if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
                 return availablePresentMode;
             }
@@ -383,6 +379,37 @@ namespace Renderer {
             actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
             return actualExtent;
+        }
+    }
+
+    /// <summary>
+    /// So we can actually use the images in or swap chain
+    /// </summary>
+    void SwapChain::createImageViews(VkDevice device) {
+        swapChainImageViews.resize(swapChainImages.size());
+
+        for (size_t i = 0; i < swapChainImages.size(); i++) {
+            VkImageViewCreateInfo createInfo{};
+            createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            createInfo.image = swapChainImages[i];
+
+            createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            createInfo.format = swapChainImageFormat;
+
+            createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+            createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            createInfo.subresourceRange.baseMipLevel = 0;
+            createInfo.subresourceRange.levelCount = 1;
+            createInfo.subresourceRange.baseArrayLayer = 0;
+            createInfo.subresourceRange.layerCount = 1;
+
+            if (vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS) {
+                throw std::runtime_error("failed to create image views!");
+            }
         }
     }
 
@@ -447,6 +474,10 @@ namespace Renderer {
         swapChainExtent = extent;
 
         printf("[Vulkan]\t Created Swap Chain\n");
+
+        createImageViews(logicalDevice->device);
+
+        printf("[Vulkan]\t Created Image Views\n");
     }
 
     SwapChain::~SwapChain() {
@@ -607,8 +638,8 @@ namespace Renderer {
     GraphicsPipeline::GraphicsPipeline(LogicalDevice* device, VkExtent2D swapChainExtent, RenderPass* renderPass) {
         logicalDevice = device;
 
-        auto vertShaderCode = readFile("shaders/vert.spv");
-        auto fragShaderCode = readFile("shaders/frag.spv");
+        std::vector<char> vertShaderCode = readFile("shaders/vert.spv");
+        std::vector<char> fragShaderCode = readFile("shaders/frag.spv");
 
         VkShaderModule vertShaderModule = createShaderModule(logicalDevice->device, vertShaderCode);
         VkShaderModule fragShaderModule = createShaderModule(logicalDevice->device, fragShaderCode);
@@ -878,7 +909,8 @@ namespace Renderer {
 
     RendererLayer::RendererLayer(RendererLayer& rh) {
         this->window = rh.window;
-        this->graphicsQueue = rh.presentQueue;
+        //this->graphicsQueue = rh.graphicsQueue;
+        //this->presentQueue = rh.presentQueue;
         this->validationLayers = rh.validationLayers;
         this->deviceExtensions = rh.deviceExtensions;
 
@@ -889,6 +921,9 @@ namespace Renderer {
         this->renderPass = rh.renderPass;
         this->graphicsPipeline = rh.graphicsPipeline;
         this->framebuffers = rh.framebuffers;
+        this->commandPool = rh.commandPool;
+        this->commandBuffer = rh.commandBuffer;
+        this->syncObjects= rh.syncObjects;
     }
 
     RendererLayer::RendererLayer(RendererLayerCreateInfo createInfo) {
@@ -906,7 +941,7 @@ namespace Renderer {
 
         surface = Surface(&instance, createInfo.window);
 
-        logicalDevice = LogicalDevice(&instance, createInfo.LI_CreateInfo, graphicsQueue, presentQueue, &surface);
+        logicalDevice = LogicalDevice(&instance, createInfo.LI_CreateInfo, &surface);
 
         swapChain = SwapChain(&logicalDevice, &surface, window);
 
@@ -946,7 +981,8 @@ namespace Renderer {
 
     RendererLayer& RendererLayer::operator=(const RendererLayer& other) {
         this->window = other.window;
-        this->graphicsQueue = other.presentQueue;
+        //this->graphicsQueue = other.graphicsQueue;
+        //this->presentQueue = other.presentQueue;
         this->validationLayers = other.validationLayers;
         this->deviceExtensions = other.deviceExtensions;
 
@@ -956,13 +992,117 @@ namespace Renderer {
         this->renderPass = other.renderPass;
         this->graphicsPipeline = other.graphicsPipeline;
         this->framebuffers = other.framebuffers;
+        this->commandPool = other.commandPool;
+        this->commandBuffer = other.commandBuffer;
+        this->syncObjects = other.syncObjects;
 
         return *this;
     }
 
+    /// <summary>
+    /// Actually adds the commands to the buffer
+    /// This is the kool part
+    /// </summary>
+    void RendererLayer::recordCommandBuffer(uint32_t imageIndex) {
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = 0; // Optional
+        beginInfo.pInheritanceInfo = nullptr; // Optional
+
+        if (vkBeginCommandBuffer(commandBuffer.commandBuffer, &beginInfo) != VK_SUCCESS) {
+            throw std::runtime_error("failed to begin recording command buffer!");
+        }
+
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = renderPass.renderPass;
+        renderPassInfo.framebuffer = framebuffers.swapChainFramebuffers[imageIndex];
+        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.extent = swapChain.swapChainExtent;
+
+        VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
+        renderPassInfo.clearValueCount = 1;
+        renderPassInfo.pClearValues = &clearColor;
+
+        vkCmdBeginRenderPass(commandBuffer.commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdBindPipeline(commandBuffer.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline.graphicsPipeline);
+
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(swapChain.swapChainExtent.width);
+        viewport.height = static_cast<float>(swapChain.swapChainExtent.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer.commandBuffer, 0, 1, &viewport);
+
+        VkRect2D scissor{};
+        scissor.offset = { 0, 0 };
+        scissor.extent = swapChain.swapChainExtent;
+        vkCmdSetScissor(commandBuffer.commandBuffer, 0, 1, &scissor);
+
+        // juuuuust like opengl
+        vkCmdDraw(commandBuffer.commandBuffer, 3, 1, 0, 0);
+
+        vkCmdEndRenderPass(commandBuffer.commandBuffer);
+
+        if (vkEndCommandBuffer(commandBuffer.commandBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("failed to record command buffer!");
+        }
+    }
+
     // TODO Draw from a scene object
     void RendererLayer::drawFrame() {
+        // Wait for previous frame to be finished
+        vkWaitForFences(logicalDevice.device, 1, &syncObjects.inFlightFence, VK_TRUE, UINT64_MAX);
 
+        vkResetFences(logicalDevice.device, 1, &syncObjects.inFlightFence);
+
+        // Get image from swap chain
+        uint32_t imageIndex;
+        vkAcquireNextImageKHR(logicalDevice.device, swapChain.swapChain, UINT64_MAX, syncObjects.imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+        vkResetCommandBuffer(commandBuffer.commandBuffer, 0);
+
+        // Write to our command buffer
+        recordCommandBuffer(imageIndex);
+
+        // Submit to the queues
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+        VkSemaphore waitSemaphores[] = { syncObjects.imageAvailableSemaphore };
+        VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT }; // trying changing to VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = waitSemaphores;
+        submitInfo.pWaitDstStageMask = waitStages;
+
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer.commandBuffer;
+
+        VkSemaphore signalSemaphores[] = { syncObjects.renderFinishedSemaphore };
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = signalSemaphores;
+
+        if (vkQueueSubmit(logicalDevice.graphicsQueue, 1, &submitInfo, syncObjects.inFlightFence) != VK_SUCCESS) {
+            throw std::runtime_error("failed to submit draw command buffer!");
+        }
+
+        // ? Reread this part
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = signalSemaphores;
+
+        VkSwapchainKHR swapChains[] = { swapChain.swapChain };
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = swapChains;
+        presentInfo.pImageIndices = &imageIndex;
+        presentInfo.pResults = nullptr; // Optional
+
+        vkQueuePresentKHR(logicalDevice.presentQueue, &presentInfo);
     }
 
 }

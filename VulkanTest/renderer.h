@@ -121,13 +121,17 @@ namespace Renderer {
         VkDevice device = VK_NULL_HANDLE;
         VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
+        // Congrats, you're here now
+        VkQueue graphicsQueue = VK_NULL_HANDLE;     // whyyyyyy aren't you working sob
+        VkQueue presentQueue = VK_NULL_HANDLE;      // Images to be presented to the screen
+
         Surface* surface = nullptr;
         Instance* instance = nullptr;
 
     public:
         LogicalDevice();
 
-        LogicalDevice(Instance* instance, LogicalDeviceCreateInfo ci, VkQueue graphicsQueue, VkQueue presentQueue, Surface* surface);
+        LogicalDevice(Instance* instance, LogicalDeviceCreateInfo ci, Surface* surface);
 
         ~LogicalDevice();
 
@@ -151,6 +155,11 @@ namespace Renderer {
         VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 
         VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, GLFWwindow* window);
+
+        /// <summary>
+        /// So we can actually use the images in or swap chain
+        /// </summary>
+        void createImageViews(VkDevice device);
 
         SwapChain();
 
@@ -265,7 +274,7 @@ namespace Renderer {
 
         VkSemaphore imageAvailableSemaphore;
         VkSemaphore renderFinishedSemaphore;
-        VkFence inFlightFence;
+        VkFence inFlightFence = VK_NULL_HANDLE;
 
         SyncObjects() = default;
 
@@ -286,8 +295,6 @@ namespace Renderer {
 #endif
 
         GLFWwindow* window = nullptr;
-        VkQueue graphicsQueue = VK_NULL_HANDLE;     // 
-        VkQueue presentQueue = VK_NULL_HANDLE;      // Images to be presented to the screen
 
         // Required Validation Layers
         std::vector<const char*> validationLayers;
@@ -318,6 +325,8 @@ namespace Renderer {
         ~RendererLayer();
 
         RendererLayer& operator=(const RendererLayer& other);
+
+        void recordCommandBuffer(uint32_t imageIndex);
 
         // TODO Draw from a scene object
         void drawFrame();

@@ -80,7 +80,7 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Architecture - Heap Issue?", nullptr, nullptr);
+        window = glfwCreateWindow(WIDTH, HEIGHT, "Yes, Vulkan is the ez - Slight Artchitected", nullptr, nullptr);
 
         printf("[Window]\t Ready!\n");
     }
