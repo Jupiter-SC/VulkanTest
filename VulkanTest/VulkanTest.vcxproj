@@ -133,6 +133,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="helloTriangleArch.cpp" />
     <ClCompile Include="helloTriangleArch.h" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="renderer.cpp" />
@@ -147,6 +148,7 @@
   <ItemGroup>
     <ClInclude Include="helloTriangleDefault.h" />
     <ClInclude Include="renderer.h" />
+    <ClInclude Include="baseApplication.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

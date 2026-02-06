@@ -6,10 +6,10 @@
 //#include "helloTriangleDefault.h"
 
 int main() {
-    HelloArchitecture app;
+    Application* app = new HelloArchitecture();
 
     try {
-        app.run();
+        app->run();
     }
     catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;

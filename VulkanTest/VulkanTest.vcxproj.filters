@@ -24,6 +24,9 @@
     <ClCompile Include="renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="helloTriangleArch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat">
@@ -47,6 +50,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="helloTriangleDefault.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="baseApplication.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

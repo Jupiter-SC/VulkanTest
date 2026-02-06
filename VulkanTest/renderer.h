@@ -315,6 +315,9 @@ namespace Renderer {
         CommandBuffer commandBuffer;
         SyncObjects syncObjects;
 
+
+        void recordCommandBuffer(uint32_t imageIndex);
+
     public:
         RendererLayer() = default;
 
@@ -326,11 +329,12 @@ namespace Renderer {
 
         RendererLayer& operator=(const RendererLayer& other);
 
-        void recordCommandBuffer(uint32_t imageIndex);
-
         // TODO Draw from a scene object
         void drawFrame();
 
+        VkDevice getDevice() {
+            return logicalDevice.device;
+        }
     };
 #pragma endregion
 
