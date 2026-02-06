@@ -823,6 +823,8 @@ namespace Renderer {
     // Command Buffer
 
     CommandBuffer::CommandBuffer(LogicalDevice* logicalDevice, CommandPool* commandPool) {
+        this->logicalDevice = logicalDevice;
+        
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = commandPool->commandPool;
@@ -844,6 +846,8 @@ namespace Renderer {
     // Sync Objects
 
     SyncObjects::SyncObjects(LogicalDevice* logicalDevice) {
+        this->logicalDevice = logicalDevice;
+
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -856,7 +860,7 @@ namespace Renderer {
             vkCreateFence(logicalDevice->device, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS) {
             throw std::runtime_error("failed to create semaphores!");
         } else {
-            printf("[Vulkan]\t Created Sync Objects");
+            printf("[Vulkan]\t Created Sync Objects\n");
         }
     }
 
@@ -926,7 +930,8 @@ namespace Renderer {
 
         // ? Should each object hold device or should I just pass it in
         // ? Deconstructor no work like this cuz it runs on copy assignment
-
+        
+        syncObjects.cleanup();
         commandPool.cleanup();
         framebuffers.cleanup();
         graphicsPipeline.cleanup();
