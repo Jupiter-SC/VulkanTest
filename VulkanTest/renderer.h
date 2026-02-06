@@ -90,10 +90,7 @@ namespace Renderer {
         Instance& operator=(const Instance& other);
 
         // This defeats like half the point of this but I have to cuz the destructors are called when using copy assignments
-        void cleanup(){
-            vkDestroyInstance(instance, nullptr);
-            printf("[Cleanup]\t Destroyed Instance\n");
-        }
+        void cleanup();
     };
 
     /// <summary>
@@ -114,10 +111,7 @@ namespace Renderer {
 
         ~Surface();
 
-        void cleanup() {        
-            vkDestroySurfaceKHR(instance->instance, surface, nullptr);
-            printf("[Cleanup]\t Destroyed Surface\n");
-        }
+        void cleanup();
     };
 
     /// <summary>
@@ -137,10 +131,7 @@ namespace Renderer {
 
         ~LogicalDevice();
 
-        void cleanup() {
-            vkDestroyDevice(device, nullptr);
-            printf("[Cleanup]\t Destroyed Logical Device\n");
-        }
+        void cleanup();
     };
 
     /// <summary>
@@ -167,25 +158,17 @@ namespace Renderer {
 
         ~SwapChain();
 
-        void cleanup() {
-            for (VkImageView imageView : swapChainImageViews) {
-                vkDestroyImageView(logicalDevice->device, imageView, nullptr);
-            }
-
-            vkDestroySwapchainKHR(logicalDevice->device, swapChain, nullptr);
-
-            printf("[Cleanup] Destroyed Swap Chain");
-        }
+        void cleanup();
     };
 
     /// <summary>
     /// 
     /// </summary>
     struct RenderPass {
+        LogicalDevice* logicalDevice = nullptr;
+
         VkRenderPass renderPass = VK_NULL_HANDLE;
 
-        LogicalDevice* logicalDevice = nullptr;
-        
         RenderPass();
 
         RenderPass(LogicalDevice* logicalDevice, VkFormat swapChainImageFormat);
@@ -196,10 +179,99 @@ namespace Renderer {
 
         RenderPass& operator=(const RenderPass& other);
 
-        void cleanup() {
-            vkDestroyRenderPass(logicalDevice->device, renderPass, nullptr);
-            printf("[Cleanup]\t Destroyed Render Pass");
-        }
+        void cleanup();
+    };
+
+
+    // TODO Shader struct eyes emoji
+
+    /// <summary>
+    /// 
+    /// </summary>
+    struct GraphicsPipeline {
+        LogicalDevice* logicalDevice = nullptr;
+        
+        VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+        VkPipeline graphicsPipeline = VK_NULL_HANDLE;
+
+        /// <summary>
+        /// Helper function for loading shaders
+        /// </summary>
+        static std::vector<char> readFile(const std::string& filename);
+
+        /// <summary>
+        /// Byte code -> usable shader module
+        /// </summary>
+        VkShaderModule createShaderModule(VkDevice device, const std::vector<char>& code);
+
+        GraphicsPipeline();
+
+        /// <summary>
+        /// The name describes it
+        /// Can we load shaders later and insert them?
+        /// </summary>
+        GraphicsPipeline(LogicalDevice* device, VkExtent2D swapChainExtent, RenderPass* renderPass);
+
+        void cleanup();
+    };
+
+    /// <summary>
+    /// 
+    /// </summary>
+    struct Framebuffer {
+        LogicalDevice* logicalDevice = nullptr;
+        
+        std::vector<VkFramebuffer> swapChainFramebuffers;
+
+        Framebuffer() = default;
+
+        Framebuffer(LogicalDevice* logicalDevice, SwapChain* swapChain, RenderPass* renderPass);
+
+        void cleanup();
+    };
+
+    struct CommandPool {
+        LogicalDevice* logicalDevice = nullptr;
+        
+        VkCommandPool commandPool = VK_NULL_HANDLE;
+
+        CommandPool() = default;
+
+        CommandPool(LogicalDevice* logicalDevice, Surface* surface);
+
+        void cleanup();
+    };
+
+    struct CommandBuffer {
+        LogicalDevice* logicalDevice = nullptr;
+
+        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+        
+        CommandBuffer() = default;
+        
+        CommandBuffer(LogicalDevice* logicalDevice, CommandPool* commandPool);
+
+        void cleanup();
+    };
+
+    /// <summary>
+    /// Sync objects are Semaphores and Fences, in order to synchronize command calls
+    /// Semaphores halt queue submission until the previous one has been received, but doesn't stop all code. 
+    /// Used for swapchain operations so the GPUs doesn't have to wait
+    /// Fences to stop all code. Used for waiting for the prev frame, so we don't draw more than one frame at a time
+    /// </summary>
+    struct SyncObjects {
+        LogicalDevice* logicalDevice = nullptr;
+
+        VkSemaphore imageAvailableSemaphore;
+        VkSemaphore renderFinishedSemaphore;
+        VkFence inFlightFence;
+
+        SyncObjects() = default;
+
+        SyncObjects(LogicalDevice* logicalDevice);
+
+        void cleanup();
     };
 
     /// <summary>
@@ -229,10 +301,15 @@ namespace Renderer {
         Surface surface;
         LogicalDevice logicalDevice;
         SwapChain swapChain;
-        RenderPass renderPass;         // Ooo
+        RenderPass renderPass;
+        GraphicsPipeline graphicsPipeline;
+        Framebuffer framebuffers;
+        CommandPool commandPool;
+        CommandBuffer commandBuffer;
+        SyncObjects syncObjects;
 
     public:
-        RendererLayer();
+        RendererLayer() = default;
 
         RendererLayer(RendererLayer& rh);
 

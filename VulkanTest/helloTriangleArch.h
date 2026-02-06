@@ -80,7 +80,7 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Architecture - Fuck Header Files", nullptr, nullptr);
+        window = glfwCreateWindow(WIDTH, HEIGHT, "But Vulkan is the hardz: Architecture - Heap Issue?", nullptr, nullptr);
 
         printf("[Window]\t Ready!\n");
     }
@@ -100,6 +100,7 @@ private:
         // Vulkan
 
         delete renderer;
+        renderer = nullptr;
 
         glfwDestroyWindow(window);
         glfwTerminate();

@@ -10,7 +10,7 @@ namespace Renderer {
     // Instance
 
     bool Instance::checkValidationLayerSupport(std::vector<const char*> validationLayers) {
-        uint32_t layerCount;
+        uint32_t layerCount = 0;
         vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
         std::vector<VkLayerProperties> availableLayers(layerCount);
@@ -112,6 +112,12 @@ namespace Renderer {
         return *this;
     }
 
+    void Instance::cleanup() {
+        vkDestroyInstance(instance, nullptr);
+        printf("[Cleanup]\t Destroyed Instance\n");
+        instance = VK_NULL_HANDLE;
+    }
+
     // Surface
 
     Surface::Surface() {}
@@ -131,6 +137,12 @@ namespace Renderer {
         //printf("[Cleanup]\t Destroyed Surface\n");
     }
 
+    void Surface::cleanup() {
+        vkDestroySurfaceKHR(instance->instance, surface, nullptr);
+        printf("[Cleanup]\t Destroyed Surface\n");
+
+        instance = nullptr;
+    }
 
 #pragma region Helper Functions
 
@@ -322,6 +334,16 @@ namespace Renderer {
         //printf("[Cleanup]\t Destroyed Logical Device\n");
     }
 
+    void LogicalDevice::cleanup() {
+        vkDestroyDevice(device, nullptr);
+        printf("[Cleanup]\t Destroyed Logical Device\n");
+
+        device = VK_NULL_HANDLE;
+        physicalDevice = VK_NULL_HANDLE;
+        surface = nullptr;
+        instance = nullptr;
+    }
+
     // Swap Chain
 
     VkSurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
@@ -435,7 +457,21 @@ namespace Renderer {
         //vkDestroySwapchainKHR(logicalDevice->device, swapChain, nullptr);
     }
 
+    void SwapChain::cleanup() {
+        for (VkImageView imageView : swapChainImageViews) {
+            vkDestroyImageView(logicalDevice->device, imageView, nullptr);
+        }
+
+        vkDestroySwapchainKHR(logicalDevice->device, swapChain, nullptr);
+
+        printf("[Cleanup]\t Destroyed Swap Chain\n");
+
+        logicalDevice = nullptr;
+        swapChain = VK_NULL_HANDLE;
+    }
+
     // Render Pass
+    // TODO Create info for this guy too
 
     RenderPass::RenderPass() {
         //this->logicalDevice == nullptr;
@@ -500,7 +536,6 @@ namespace Renderer {
         renderPass(other.renderPass), logicalDevice(other.logicalDevice)
     {}
 
-
     RenderPass& RenderPass::operator=(const RenderPass& other)
     {
         this->logicalDevice = other.logicalDevice;
@@ -509,15 +544,333 @@ namespace Renderer {
         return *this;
     }
 
+    void RenderPass::cleanup() {
+        vkDestroyRenderPass(logicalDevice->device, renderPass, nullptr);
+        printf("[Cleanup]\t Destroyed Render Pass\n");
+
+        logicalDevice = nullptr;
+        renderPass = VK_NULL_HANDLE;
+    }
+
+    // Graphics Pipeline
+    // TODO Make shader class
+    // TODO Pass in create info on application layer
+
+    /// <summary>
+    /// Helper function for loading shaders
+    /// </summary>
+    std::vector<char> GraphicsPipeline::readFile(const std::string& filename) {
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+        if (!file.is_open()) {
+            throw std::runtime_error("Failed to open file: " + filename);
+        }
+
+        size_t fileSize = (size_t)file.tellg();
+        std::vector<char> buffer(fileSize);
+
+        file.seekg(0);
+        file.read(buffer.data(), fileSize);
+        file.close();
+
+        printf("[Vulkan]\t Shader Loaded: ");
+        printf(filename.c_str());
+        printf("\n");
+
+        return buffer;
+    }
+
+    /// <summary>
+    /// Byte code -> usable shader module
+    /// </summary>
+    VkShaderModule GraphicsPipeline::createShaderModule(VkDevice device, const std::vector<char>& code) {
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = code.size();
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+        // this is getting really familiar
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create shader module!");
+        }
+
+        return shaderModule;
+    }
+
+    GraphicsPipeline::GraphicsPipeline() {}
+
+    /// <summary>
+    /// The name describes it
+    /// Can we load shaders later and insert them?
+    /// </summary>
+    GraphicsPipeline::GraphicsPipeline(LogicalDevice* device, VkExtent2D swapChainExtent, RenderPass* renderPass) {
+        logicalDevice = device;
+
+        auto vertShaderCode = readFile("shaders/vert.spv");
+        auto fragShaderCode = readFile("shaders/frag.spv");
+
+        VkShaderModule vertShaderModule = createShaderModule(logicalDevice->device, vertShaderCode);
+        VkShaderModule fragShaderModule = createShaderModule(logicalDevice->device, fragShaderCode);
+
+        VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertShaderStageInfo.module = vertShaderModule;
+        vertShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+        fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragShaderStageInfo.module = fragShaderModule;
+        fragShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInputInfo.vertexBindingDescriptionCount = 0;
+        vertexInputInfo.vertexAttributeDescriptionCount = 0;
+
+        // What kind of primitive will be drawn
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+        // Self explanitory
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float)swapChainExtent.width;
+        viewport.height = (float)swapChainExtent.height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+
+        VkRect2D scissor{};
+        scissor.offset = { 0, 0 };
+        scissor.extent = swapChainExtent;
+
+        VkPipelineViewportStateCreateInfo viewportState{};
+        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1;
+        viewportState.pViewports = &viewport;
+        viewportState.scissorCount = 1;
+        viewportState.pScissors = &scissor;
+
+        // Fixed function
+        VkPipelineRasterizationStateCreateInfo rasterizer{};
+        rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterizer.depthClampEnable = VK_FALSE;
+        rasterizer.rasterizerDiscardEnable = VK_FALSE;
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizer.lineWidth = 1.0f;
+        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        rasterizer.depthBiasEnable = VK_FALSE;
+
+        VkPipelineMultisampleStateCreateInfo multisampling{};
+        multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        multisampling.sampleShadingEnable = VK_FALSE;
+        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.blendEnable = VK_FALSE;
+
+        VkPipelineColorBlendStateCreateInfo colorBlending{};
+        colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlending.logicOpEnable = VK_FALSE;
+        colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
+        colorBlending.attachmentCount = 1;
+        colorBlending.pAttachments = &colorBlendAttachment;
+        colorBlending.blendConstants[0] = 0.0f; // Optional
+        colorBlending.blendConstants[1] = 0.0f; // Optional
+        colorBlending.blendConstants[2] = 0.0f; // Optional
+        colorBlending.blendConstants[3] = 0.0f; // Optional
+
+        std::vector<VkDynamicState> dynamicStates = {
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR
+        };
+
+        VkPipelineDynamicStateCreateInfo dynamicState{};
+        dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+        dynamicState.pDynamicStates = dynamicStates.data();
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 0; // Optional
+        pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
+        pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
+        pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
+
+        if (vkCreatePipelineLayout(logicalDevice->device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create pipeline layout!");
+        }
+        else {
+            printf("[Vulkan]\t Created Graphics Pipeline Layout\n");
+        }
+
+        // Finally The actual struct
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+
+        // Fixed function stages
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState = &multisampling;
+        pipelineInfo.pDepthStencilState = nullptr; // Optional
+        pipelineInfo.pColorBlendState = &colorBlending;
+        pipelineInfo.pDynamicState = &dynamicState;
+
+        pipelineInfo.layout = pipelineLayout;
+        pipelineInfo.renderPass = renderPass->renderPass;
+        pipelineInfo.subpass = 0;
+
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
+        pipelineInfo.basePipelineIndex = -1; // Optional
+
+
+        if (vkCreateGraphicsPipelines(logicalDevice->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create graphics pipeline!");
+        }
+        else {
+            printf("[Vulkan]\t Created Graphics Pipeline!\n");
+        }
+
+        vkDestroyShaderModule(logicalDevice->device, fragShaderModule, nullptr);
+        vkDestroyShaderModule(logicalDevice->device, vertShaderModule, nullptr);
+    }
+
+    void GraphicsPipeline::cleanup() {
+        vkDestroyPipeline(logicalDevice->device, graphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(logicalDevice->device, pipelineLayout, nullptr);
+
+        logicalDevice = nullptr;
+        pipelineLayout = VK_NULL_HANDLE;
+        graphicsPipeline = VK_NULL_HANDLE;
+    }
+
+    // Framebuffer
+
+    Framebuffer::Framebuffer(LogicalDevice* logicalDevice, SwapChain* swapChain, RenderPass* renderPass) {
+        this->logicalDevice = logicalDevice;
+
+        swapChainFramebuffers.resize(swapChain->swapChainImageViews.size());
+
+        for (size_t i = 0; i < swapChain->swapChainImageViews.size(); i++) {
+            VkImageView attachments[] = {
+                swapChain->swapChainImageViews[i]
+            };
+
+            VkFramebufferCreateInfo framebufferInfo{};
+            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            framebufferInfo.renderPass = renderPass->renderPass;
+            framebufferInfo.attachmentCount = 1;
+            framebufferInfo.pAttachments = attachments;
+            framebufferInfo.width = swapChain->swapChainExtent.width;
+            framebufferInfo.height = swapChain->swapChainExtent.height;
+            framebufferInfo.layers = 1;
+
+            if (vkCreateFramebuffer(logicalDevice->device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
+                throw std::runtime_error("failed to create framebuffer!");
+            }
+        }
+
+        printf("[Vulkan]\t Created Framebuffers\n");
+    }
+
+    void Framebuffer::cleanup() {
+        for (VkFramebuffer framebuffer : swapChainFramebuffers) {
+            vkDestroyFramebuffer(logicalDevice->device, framebuffer, nullptr);
+        }
+
+        logicalDevice = nullptr;
+    }
+    
+    // Command Pool - Combine these?
+
+    CommandPool::CommandPool(LogicalDevice* logicalDevice, Surface* surface) {
+        this->logicalDevice = logicalDevice;
+
+        QueueFamilyIndices queueFamilyIndices = findQueueFamilies(logicalDevice->physicalDevice, surface->surface);
+
+        VkCommandPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+        if (vkCreateCommandPool(logicalDevice->device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create command pool!");
+        }
+
+        printf("[Vulkan]\t Created Command Pool\n");
+    }
+
+    void CommandPool::cleanup() {
+        vkDestroyCommandPool(logicalDevice->device, commandPool, nullptr);
+        printf("[Cleanup]\t Destroyed Command Pool\n");
+
+        logicalDevice = nullptr;
+    }
+
+    // Command Buffer
+
+    CommandBuffer::CommandBuffer(LogicalDevice* logicalDevice, CommandPool* commandPool) {
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = commandPool->commandPool;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = 1;
+
+        if (vkAllocateCommandBuffers(logicalDevice->device, &allocInfo, &commandBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate command buffers!");
+        } else {
+            printf("[Vulkan]\t Created Command Buffer\n");
+        }
+    }
+
+    void CommandBuffer::cleanup() {
+
+        logicalDevice = nullptr;
+    }
+
+    // Sync Objects
+
+    SyncObjects::SyncObjects(LogicalDevice* logicalDevice) {
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;     // Starting off signaled to avoid infinite loop on first draw
+
+        if (vkCreateSemaphore(logicalDevice->device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
+            vkCreateSemaphore(logicalDevice->device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS ||
+            vkCreateFence(logicalDevice->device, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create semaphores!");
+        } else {
+            printf("[Vulkan]\t Created Sync Objects");
+        }
+    }
+
+    void SyncObjects::cleanup() {
+        vkDestroySemaphore(logicalDevice->device, imageAvailableSemaphore, nullptr);
+        vkDestroySemaphore(logicalDevice->device, renderFinishedSemaphore, nullptr);
+        vkDestroyFence(logicalDevice->device, inFlightFence, nullptr);
+
+        logicalDevice = nullptr;
+    }
+
 #pragma endregion
 
     // Renderer Layer
-
-    RendererLayer::RendererLayer()
-    {
-        printf("BROOO\n");
-        return;
-    }
 
     RendererLayer::RendererLayer(RendererLayer& rh) {
         this->window = rh.window;
@@ -528,6 +881,10 @@ namespace Renderer {
         this->instance = rh.instance;
         this->surface = rh.surface;
         this->logicalDevice = rh.logicalDevice;
+        this->swapChain = rh.swapChain;
+        this->renderPass = rh.renderPass;
+        this->graphicsPipeline = rh.graphicsPipeline;
+        this->framebuffers = rh.framebuffers;
     }
 
     RendererLayer::RendererLayer(RendererLayerCreateInfo createInfo) {
@@ -535,9 +892,11 @@ namespace Renderer {
 
         printf("[Vulkan]\t Initting Vulkan\n");
 
-        // Hmmm who should own these cuz they're being passed twice in 2 diff ways rn
+        // ? Hmmm who should own these cuz they're being passed twice in 2 diff ways rn
         validationLayers = createInfo.LI_CreateInfo.validationLayers;
         deviceExtensions = createInfo.LI_CreateInfo.deviceExtensions;
+
+        // ? Should I pass in wrapper objects or Vulkan objects if there's only 1 thing being used
 
         instance = Instance(enableValidationLayers, validationLayers);
 
@@ -549,11 +908,15 @@ namespace Renderer {
 
         renderPass = RenderPass(&logicalDevice, swapChain.swapChainImageFormat);
 
-        //createGraphicsPipeline();   // It's really that easy
-        //createFramebuffers();       // Back to more familiar territory
-        //createCommandPool();
-        //createCommandBuffer();
-        //createSyncObjects();
+        graphicsPipeline = GraphicsPipeline(&logicalDevice, swapChain.swapChainExtent, &renderPass);
+
+        framebuffers = Framebuffer(&logicalDevice, &swapChain, &renderPass);
+
+        commandPool = CommandPool(&logicalDevice, &surface);
+
+        commandBuffer = CommandBuffer(&logicalDevice, &commandPool);
+
+        syncObjects = SyncObjects(&logicalDevice);
 
         printf("[Vulkan]\t Ready!\n");
     }
@@ -561,20 +924,20 @@ namespace Renderer {
     RendererLayer::~RendererLayer() {
         printf("[Cleanup]\t Destroying Renderer Layer...\n");
 
+        // ? Should each object hold device or should I just pass it in
+        // ? Deconstructor no work like this cuz it runs on copy assignment
+
+        commandPool.cleanup();
+        framebuffers.cleanup();
+        graphicsPipeline.cleanup();
         renderPass.cleanup();
         swapChain.cleanup();
         surface.cleanup();
         logicalDevice.cleanup();
         instance.cleanup();
-
-        //delete renderPass;
-        //delete swapChain;
-        //delete surface;
-        //delete logicalDevice;
-        //delete instance;
-
-        printf("[Cleanup]\t Destroyed Renderer Layer\n");
-    }
+        
+        //printf("[Cleanup]\t Destroyed Renderer Layer\n");
+      }
 
     RendererLayer& RendererLayer::operator=(const RendererLayer& other) {
         this->window = other.window;
@@ -585,6 +948,9 @@ namespace Renderer {
         this->instance = other.instance;
         this->surface = other.surface;
         this->logicalDevice = other.logicalDevice;
+        this->renderPass = other.renderPass;
+        this->graphicsPipeline = other.graphicsPipeline;
+        this->framebuffers = other.framebuffers;
 
         return *this;
     }
