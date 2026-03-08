@@ -11,5 +11,5 @@ Renderer::RendererLayerCreateInfo HelloArchitecture::createRenderLayerInfo()
 
     // What's the deal with copy contructors ?
 
-    return Renderer::RendererLayerCreateInfo();
+    return Renderer::RendererLayerCreateInfo(RL_CreateInfo);
 }
