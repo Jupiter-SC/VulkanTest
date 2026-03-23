@@ -1006,7 +1006,7 @@ namespace Renderer {
     void RendererLayer::recordCommandBuffer(uint32_t imageIndex) {
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = 0; // Optional
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;; // Optional
         beginInfo.pInheritanceInfo = nullptr; // Optional
 
         if (vkBeginCommandBuffer(commandBuffer.commandBuffer, &beginInfo) != VK_SUCCESS) {
@@ -1085,6 +1085,7 @@ namespace Renderer {
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
+        // TODO This is the problem. When it tries to submit the second command
         if (vkQueueSubmit(logicalDevice.graphicsQueue, 1, &submitInfo, syncObjects.inFlightFence) != VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
         }
@@ -1104,5 +1105,4 @@ namespace Renderer {
 
         vkQueuePresentKHR(logicalDevice.presentQueue, &presentInfo);
     }
-
 }

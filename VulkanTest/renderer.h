@@ -22,6 +22,8 @@
 #include <algorithm>
 #include <fstream>
 
+const int MAX_FRAMES_IN_FLIGHT = 2;
+
 namespace Renderer {
 
 #pragma region Create Infos
@@ -282,6 +284,8 @@ namespace Renderer {
 
         void cleanup();
     };
+#pragma endregion
+
 
     /// <summary>
     /// 
@@ -293,7 +297,7 @@ namespace Renderer {
 #else
         const bool enableValidationLayers = true;
 #endif
-
+        // :)
         GLFWwindow* window = nullptr;
 
         // Required Validation Layers
@@ -302,8 +306,7 @@ namespace Renderer {
         // Required Extensions
         std::vector<const char*> deviceExtensions;
 
-        // These are only woking as pointers cuz otherwise they get destroyed too soon, but IDK why
-
+        // Vulkan Specific Objects
         Instance instance;
         Surface surface;
         LogicalDevice logicalDevice;
@@ -314,7 +317,6 @@ namespace Renderer {
         CommandPool commandPool;
         CommandBuffer commandBuffer;
         SyncObjects syncObjects;
-
 
         void recordCommandBuffer(uint32_t imageIndex);
 
@@ -332,10 +334,12 @@ namespace Renderer {
         // TODO Draw from a scene object
         void drawFrame();
 
+        void waitIdle() {
+            vkDeviceWaitIdle(getDevice());
+        }
+
         VkDevice getDevice() {
             return logicalDevice.device;
         }
     };
-#pragma endregion
-
 }

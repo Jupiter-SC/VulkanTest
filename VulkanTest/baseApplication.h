@@ -30,7 +30,7 @@ class Application {
 public:
     void run() {
         initWindow();
-        initGraphicsLayer();
+        initRendererLayer();
         mainLoop();
         cleanup();
     }
@@ -60,7 +60,7 @@ protected:
         printf("[Window]\t Ready!\n");
     }
 
-    void initGraphicsLayer() {
+    void initRendererLayer() {
         renderer = new Renderer::RendererLayer(createRenderLayerInfo());
     }
 
@@ -70,7 +70,9 @@ protected:
             renderer->drawFrame();
         }
 
-        vkDeviceWaitIdle(renderer->getDevice());
+        // TODO evil Vulkan call here
+        //vkDeviceWaitIdle(renderer->getDevice());
+        renderer->waitIdle();
     }
 
     void cleanup() {
